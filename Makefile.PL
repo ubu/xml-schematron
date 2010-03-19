@@ -5,8 +5,12 @@ WriteMakefile(
     'NAME'	=> 'XML::Schematron',
     'VERSION_FROM' => 'lib/XML/Schematron.pm', # finds $VERSION
     'PREREQ_PM' => {
-        XML::SAX        => 0,
-        XML::LibXML     => 0,
-        XML::LibXSLT    => 0,
+        XML::SAX                    => 0,
+        XML::LibXML                 => 0,
+        XML::LibXSLT                => 0,
+        MooseX::NonMoose            => 0,
+        Moose                       => 0,
+        MooseX::Types::Path::Class  => 0,
+        XML::Filter::BufferText     => 0,
      },
 );

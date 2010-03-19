@@ -10,7 +10,6 @@ use XML::SAX::ParserFactory;
 use XML::Schematron::SchemaReader;
 use XML::Filter::BufferText;
 use XML::Schematron::Test;
-use Data::Dumper;
 
 
 has schema => (
