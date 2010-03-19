@@ -1,15 +1,58 @@
 package XML::Schematron::LibXSLT;
+use Moose::Role;
 
-use strict;
-use XML::Schematron;
 use XML::LibXSLT;
 use XML::LibXML;
 
-use vars qw/@ISA $VERSION/;
 
-@ISA = qw/XML::SchematronXSLTProcessor/;
-$VERSION = '0.98';
+has xml_parser => (
+    is          =>  'ro',
+    isa         =>  'XML::LibXML',
+    required    =>  1,
+    default     =>  sub { XML::LibXML->new(); },
+);
 
+has xslt_processor => (
+    is          =>  'ro',
+    isa         =>  'XML::LibXSLT',
+    required    =>  1,
+    default     =>  sub {  XML::LibXSLT->new(); },
+);
+
+sub verify {
+    my $self = shift;    
+    my $xml = shift;
+
+    $self->parse_schema;
+
+    my $template = $self->dump_xsl;
+    my $xml_doc;
+
+    if ( $xml =~ /^\s*<\?\s*(xml|XML)\b/ ) {
+        $xml_doc = $self->xml_parser->parse_string($xml);
+    }
+    else {
+        $xml_doc = $self->xml_parser->parse_file($xml);
+    }
+
+    my $style_doc = $self->xml_parser->parse_string($template);
+    
+    my $stylesheet = $self->xslt_processor->parse_stylesheet($style_doc);
+    my $result = $stylesheet->transform($xml_doc);
+    my $ret_string = $stylesheet->output_as_bytes($result);
+
+    if (wantarray) {
+        my @ret_array = split "\n", $ret_string;
+        return @ret_array;
+    }
+
+    return $ret_string;
+}
+
+with 'XML::Schematron::XSLTProcessor';
+1;
+
+=cut
 sub verify {
     my $self = shift;    
     my $xml = shift;

@@ -1,11 +1,80 @@
 package XML::Schematron;
 
-use strict;
-use XML::Parser::PerlSAX;
-
 use vars qw/$VERSION/;
+$VERSION = '1.02';
 
-$VERSION = '0.98';
+use Moose;
+
+use MooseX::Types::Path::Class;
+use XML::SAX::ParserFactory;
+use XML::Schematron::SchemaReader;
+use XML::Filter::BufferText;
+use XML::Schematron::Test;
+use Data::Dumper;
+
+
+has schema => (
+    is      =>  'rw',
+    isa      => 'Path::Class::File',
+    required => 1,
+    coerce   => 1,
+);
+
+has tests => (
+    traits      => ['Array'],
+    is          =>  'rw',
+    isa         =>  'ArrayRef[XML::Schematron::Test]',
+    handles     => {
+        add_test    => 'push',
+        all_tests   => 'elements',
+
+    }
+);
+
+has sax_filter => (
+    is          =>  'ro',
+    isa         =>  'XML::Filter::BufferText',
+    lazy_build  => 1,
+);
+
+sub _build_sax_filter {
+    my $self = shift;
+    return XML::Filter::BufferText->new( Handler => $self->sax_handler );
+}
+
+has sax_handler => (
+    is          =>  'ro',
+    isa         =>  'XML::Schematron::SchemaReader',
+    default     => sub { return XML::Schematron::SchemaReader->new(); },
+);
+
+has sax_parser => (
+    is          =>  'ro',
+    isa         =>  'Object',
+    lazy_build  =>  1,
+);
+
+sub _build_sax_parser {
+    my $self = shift;
+    return XML::SAX::ParserFactory->parser(Handler => $self->sax_filter);
+}
+
+sub parse_schema {
+    my $self = shift;
+    my $parser = $self->sax_parser;
+    $parser->parse_file( $self->schema->stringify );
+    
+    my $tests = $self->sax_handler->test_stack || [];    
+    $self->tests( $tests );
+    
+    return 1;
+}
+
+with 'XML::Schematron::LibXSLT';
+
+1;
+
+=cut
 
 sub new {
     my ($proto, %args) = @_;
@@ -46,6 +115,7 @@ sub schema {
     my $self = shift;
     return $_[0] ? $self->{schema} = $_[0] : $self->{schema};
 }
+
 1;
 
 package SchematronReader;
@@ -157,6 +227,7 @@ sub tests_to_xsl {
         $test =~ s/>/&gt;/g;
         $message =~ s/\n//g;
         $message .= "\n";
+        $pattern ||= '';
     
         if ($context_path ne $last_context_path) {
              $template .= qq{\n<xsl:apply-templates $ns mode="$mode"/>\n} unless $priority == 4000;
