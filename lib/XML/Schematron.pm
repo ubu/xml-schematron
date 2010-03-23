@@ -1,267 +1,59 @@
 package XML::Schematron;
 
 use vars qw/$VERSION/;
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 use Moose;
+with 'MooseX::Traits';
 
-use MooseX::Types::Path::Class;
-use XML::SAX::ParserFactory;
-use XML::Schematron::SchemaReader;
-use XML::Filter::BufferText;
+use Moose::Util::TypeConstraints;
 use XML::Schematron::Test;
+use Check::ISA;
 
 
-has schema => (
-    is      =>  'rw',
-    isa      => 'Path::Class::File',
-    required => 1,
-    coerce   => 1,
-);
+has '+_trait_namespace' => ( default => 'XML::Schematron' );
+
+#subtype 'My::XML::Schematron::Test' => as class_type('XML::Schematron::Test');
+
+#coerce 'My::XML::Schematron::Test'
+#    => from 'HashRef'
+#        => via { warn "WWWTTTFFF"; XML::Schematron::Test->new( %{$_} ) };
+
 
 has tests => (
     traits      => ['Array'],
     is          =>  'rw',
     isa         =>  'ArrayRef[XML::Schematron::Test]',
+    default     =>  sub { [] },    
     handles     => {
-        add_test    => 'push',
+        _add_test    => 'push',
         all_tests   => 'elements',
-
     }
 );
 
-has sax_filter => (
-    is          =>  'ro',
-    isa         =>  'XML::Filter::BufferText',
-    lazy_build  => 1,
-);
-
-sub _build_sax_filter {
-    my $self = shift;
-    return XML::Filter::BufferText->new( Handler => $self->sax_handler );
-}
-
-has sax_handler => (
-    is          =>  'ro',
-    isa         =>  'XML::Schematron::SchemaReader',
-    default     => sub { return XML::Schematron::SchemaReader->new(); },
-);
-
-has sax_parser => (
-    is          =>  'ro',
-    isa         =>  'Object',
-    lazy_build  =>  1,
-);
-
-sub _build_sax_parser {
-    my $self = shift;
-    return XML::SAX::ParserFactory->parser(Handler => $self->sax_filter);
-}
-
-sub parse_schema {
-    my $self = shift;
-    my $parser = $self->sax_parser;
-    $parser->parse_file( $self->schema->stringify );
-    
-    my $tests = $self->sax_handler->test_stack || [];    
-    $self->tests( $tests );
-    
-    return 1;
-}
-
-with 'XML::Schematron::LibXSLT';
-
-1;
-
-=cut
-
-sub new {
-    my ($proto, %args) = @_;
-    my $class = ref($proto) || $proto;
-    my $self  = { schema => $args{schema} || '',
-                  tests  => $args{tests}  || []};
-    bless ($self, $class);
-    return $self;
-}
-
-sub build_tests {
-    my $self = shift;
-    my $schema = $_[0] || $self->{schema};
-    my $sax_handler = SchematronReader->new();
-    my $sax_parser = XML::Parser::PerlSAX->new( Handler => $sax_handler);
-    $sax_parser->parse(Source => {SystemId => $schema});
-    push (@{$self->{tests}}, @{$sax_handler->{tests}});
-
-    # switch back when Orchard matures
-    # push (@{$self->{tests}}, $sax_parser->parse($schema));
-
-}
 
 sub add_test {
     my $self = shift;
-    my %args = @_;
-    $args{pattern} ||= '[none]';
-#   print "adding test $args{expr}, $args{context}, $args{message}, $args{type}, $args{pattern} \n";
-    push (@{$self->{tests}}, [$args{expr}, $args{context}, $args{message}, $args{type}, $args{pattern}]);    
+    my $ref = shift;
+
+    if ( obj($ref, 'XML::Schematron::Test') ) {
+            $self->_add_test( $ref );
+    }
+    else {
+        $self->_add_test( XML::Schematron::Test->new( %{$ref} ) );
+    }
 }
 
-sub tests {
+sub add_tests {
     my $self = shift;
-    return $_[0] ? $self->{tests} = $_[0] : $self->{tests};
-}
-
-sub schema {
-    my $self = shift;
-    return $_[0] ? $self->{schema} = $_[0] : $self->{schema};
+    my @tests = @_;
+    foreach my $test (@tests) {
+        $self->add_test( $test );
+    }
 }
 
 1;
 
-package SchematronReader;
-use strict;
-
-use vars qw/$context $current_ns $action $message $test @tests $pattern/;
-
-sub new {
-    my $type = shift;
-    return bless {}, $type;
-}
-
-sub start_element {
-    my ($self, $el) = @_;
-    my ($package, $filename, $line) = caller;
-    
-    # warn "Starting element $el->{Name}\n";
-
-    # switch back when Orchard matures
-
-    my %attrs = %{$el->{Attributes}};
-
-    #foreach my $attr (keys %{$el->{Attributes}}) {
-    #    $attrs{$el->{Attributes}->{$attr}->{LocalName}} = $el->{Attributes}->{$attr}->{Value};
-    #}
-
-    $context = $attrs{context} if ($attrs{context});
-
-    if (($el->{Name} =~ /(assert|report)$/)) {
-        $test = $attrs{test};
-    }
-    elsif ($el->{Name} eq 'pattern') {
-        $pattern = $attrs{name};
-    }
-}
-
-sub end_element {
-    my ($self, $el) = @_;
-    my ($ns, $test_type);
-    if (($el->{Name} =~ /(assert|report)$/)) {
-        if ($el->{Name} =~ /^(.+?):(.+?)$/) {
-            $ns = $1;
-            $test_type = $2;
-        }
-        else {
-            $test_type = $el->{Name};
-        }
-
-        push (@tests, [$test, $context, $message, $test_type, $pattern]);
-        $message = ''; 
-    }
-}
-
-sub characters {
-    my ($self, $characters) = @_;
-    if ($characters->{Data} =~ /[^\s\n]/g) {
-        my $chars = $characters->{Data};
-        $chars =~ s/\B\s\.?//g;
-        $message .= $chars
-    }
-}
-
-sub end_document {
-     my $self = shift;
-     # when the doc ends, return the tests
-     $self->{tests} =  \@tests;
-}
-
-sub start_document {
-    # sax conformance only.
-}
-
-sub processing_instruction {
-    # sax conformance only.
-}
-
-sub comment {
-    # sax conformance only.
-}
-
-
-1;
-
-package XML::SchematronXSLTProcessor;
-
-use vars qw/@ISA/; 
-        
-@ISA = qw/XML::Schematron/;
-
-sub tests_to_xsl {
-    my $self = shift;
-    my $template;
-    my $mode = 'M0';
-    my $ns = qq{xmlns:xsl="http://www.w3.org/1999/XSL/Transform"};
-        
-    $template = qq{<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-    <xsl:stylesheet $ns version="1.0">
-    <xsl:output $ns method="text"/>
-    <xsl:template $ns match="/">
-    <xsl:apply-templates $ns select="/" mode="$mode"/>};
-        
-            
-    my $last_context_path = '';
-    my $priority = 4000;
-    foreach my $testref (@{$self->{tests}}) {
-        my ($test, $context_path, $message, $test_type, $pattern) = @{$testref};
-        $context_path =~ s/"/'/g if $context_path =~ /"/g;
-        $test =~ s/</&lt;/g;
-        $test =~ s/>/&gt;/g;
-        $message =~ s/\n//g;
-        $message .= "\n";
-        $pattern ||= '';
-    
-        if ($context_path ne $last_context_path) {
-             $template .= qq{\n<xsl:apply-templates $ns mode="$mode"/>\n} unless $priority == 4000;
-             $template .= qq{</xsl:template>\n<xsl:template $ns match="$context_path" priority="$priority" mode="$mode">};
-             $priority--;
-        }
-    
-        if ($test_type eq 'assert') {
-            $template .= qq{<xsl:choose $ns>
-                            <xsl:when $ns test="$test"/>
-                            <xsl:otherwise $ns>In pattern $pattern: $message</xsl:otherwise>
-                            </xsl:choose>};
-        }
-        else {
-            $template .= qq{<xsl:if $ns test="$test">In pattern $pattern: $message</xsl:if>};
-        }
-        $last_context_path = $context_path;
-    }
-        
-        
-    $template .= qq{<xsl:apply-templates $ns mode="$mode"/>\n</xsl:template>\n
-                    <xsl:template xmlns:xsl="http://www.w3.org/1999/XSL/Transform" match="text()" priority="-1" mode="M0"/>
-                    </xsl:stylesheet>};
-        
-    #print "$template\n";
-    return $template;
-}
-
-sub dump_xsl {
-    my $self = shift;
-    my $stylesheet = $self->tests_to_xsl;;
-    return $stylesheet;
-}
-
-1;
 __END__
 # Below is the stub of documentation for your module. You better edit it!
 
@@ -285,7 +77,7 @@ Kip Hampton, khampton@totalcinema.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it
+Copyright (c) 2000-2010 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself. 
 
 =head1 SEE ALSO

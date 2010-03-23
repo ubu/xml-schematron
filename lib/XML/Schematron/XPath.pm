@@ -1,22 +1,16 @@
 package XML::Schematron::XPath;
+use Moose::Role;
+with 'XML::Schematron::Schema';
 
-use strict;
-use XML::Schematron;
 use XML::XPath;
-
-use vars qw/@ISA $VERSION/;
-
-@ISA = qw/XML::Schematron/;
-$VERSION = '0.98';
 
 sub verify {
     my $self = shift;    
     my $xml = shift;
         
-    my ($ret_strings, $do_array, @ret_array);
-    $do_array++ if wantarray;
+    my @messages = ();
 
-    $self->build_tests if $self->{schema};
+    $self->parse_schema if $self->has_schema;
 
     #TODO: let 'em invisibly pass filehandles, too.
 
@@ -29,33 +23,28 @@ sub verify {
         $xp = XML::XPath->new(filename => $xml);
     }
 
+    foreach my $test ( $self->all_tests) {
 
-    foreach my $testref (@{$self->{tests}}) {
-        # some needless duplication here but it enhances readability
-        my ($test, $context_path, $message, $test_type, $pattern) = @{$testref};
         my $step_count = 0;
         my $node_count = 0;
-        my $context = 0;
-        $message =~ s/\n/\s/g;
-
+        my $context    = 0;
+        
         # make sure our search is global unless they specified a path
-        $context_path = qq{//$context_path} unless $context_path =~ m|^/|; 
-
-#        debugging is our friend
-#        print "test is $test \n"; 
-#        print "context path is $context_path\n";
-#        print "message is  $message\n";
-#        print "type $test_type\n";
+        unless ( $test->context =~ m|^/| ) {
+            my $temp = $test->context;
+            $temp = qq|//$temp|;   
+            $test->context($temp);
+        } 
 
         # here's the beef...
         # it seems too simple (and probably is) :>
 
-        foreach my $node ($xp->findnodes($context_path)->get_nodelist) {
-                $step_count++ if $node->find($test);
+        foreach my $node ($xp->findnodes($test->context)->get_nodelist) {
+                $step_count++ if $node->find($test->expression);
         }
 
-        if ($test_type eq 'assert') {      
-            my $dupe_node = $xp->findnodes($context_path);
+        if ($test->test_type eq 'assert') {      
+            my $dupe_node = $xp->findnodes($test->context);
             $node_count = $dupe_node->size;
         }
         else {
@@ -65,16 +54,11 @@ sub verify {
          #print "node_count for $test is $node_count step_count is $step_count\n";
         
         if ($node_count != $step_count) {
-            if ($do_array) {
-                push (@ret_array, "In pattern $pattern: $message");
-            }
-            else {
-                $ret_strings .= "In pattern $pattern: $message\n";
-            }
+            push (@messages, sprintf("In pattern %s: %s", $test->pattern, $test->message) );
         }
     }
 
-    return $do_array ? @ret_array : $ret_strings;  
+    return wantarray ? @messages : join "\n", @messages;  
 }
 
 
@@ -88,8 +72,12 @@ XML::Schematron::XPath - Perl extension for validating XML with XPath expression
 
 =head1 SYNOPSIS
 
-  use XML::Schematron::XPath;
-  my $pseudotron = XML::Schematron::XPath->new(schema => 'my_schema.xml');
+  use XML::Schematron
+  my $pseudotron = XML::Schematron->new_with_traits( traits => ['XPath'], schema => 'my_schema.xml' );
+  
+  # optionally, add some addition tests from perl-space
+  $pseudotron->add_tests( @some_tests );
+  
   my $messages = $pseudotron->verify('my_file.xml');
 
   if ($messages) {
@@ -107,7 +95,7 @@ XML::Schematron::XPath serves as a simple validator for XML based on Rick JELLIF
 schema defines a set of rules in the XPath language that are used to examine the contents of an XML document tree.
 
 A simplified example: 
-
+ <?xml version="1.0"?>
  <schema>
   <pattern>
    <rule context="page">
@@ -125,46 +113,15 @@ only if the test expression evalutes to true.
 
 =over 4
 
-=item new()
+=item add_test(\%args);
 
-The 'new' constructor accepts the following "named" arguments:
-
-=over 4
-
-=item * schema
-
-The filename of the schema to use for generating tests.
-
-=item * tests
-
-The tests argument is an B<alternative> to the use of a schema as a means for defining the test stack. It should be a 
-reference to a list of lists where the format of the sub-lists must conform to the following order:
-
-   [$xpath_exp, $context, $message, $test_type, $pattern] 
-
-=back
-
-=item schema()
-
-When called with a single scalar as its argument, this method sets/updates the schema file to be used for generatng
-tests. Otherwise, it simply returns the name of the schema file (if any).
-
-=item tests()
-
-When called with a reference to a list of lists as its argument (see the format in the description of the 'tests' argument to 
-the new() method for details), this method sets the current test stack. Otherwise, it returns an arrayref to the current test
-stack (if any).
-
-=item add_test(%args);
-
-The add_test() method allows you push additional tests on to the stack before validation using the typical "hash of named
-parameters" style.
+The add_test() method allows you push additional a additional test on to the stack before validation. This method's argument must be an XML::Schematron::Test object or a hash reference with the following structure:
 
 Arguments for this method:
 
 =over 4
 
-=item * expr (required)
+=item * expression (required)
 
 The XPath expression to evaluate.
 
@@ -172,9 +129,9 @@ The XPath expression to evaluate.
 
 An element name or XPath location to use as the context of the test expression.
 
-=item * type (required)
+=item * test_type (required)
 
-The B<type> argument must be set to either 'assert' or 'report'. Assert tests will return the associated message
+The B<test_type> argument must be set to either 'assert' or 'report'. Assert tests will return the associated message
 only if the the corresponding test expression is B<not> true, while 'report' tests will return only if their associated test
 expression B<are> true.  
 
@@ -190,15 +147,19 @@ Optional descriptive text for the returned message that allows a logical groupin
 Example:
 
 
-  $obj->add_test(expr => 'count(@*) > 0',
+  $obj->add_test({expr => 'count(@*) > 0',
                  context => '/pattern',       
                  message => 'Pattern should have at least one attribute',
                  type => 'assert',
-                 pattern => 'Basic tests');
+                 pattern => 'Basic tests'});
 
 Note that add_test() pushes a new test on to the existing test list, while tests() redefines the entire list.
 
 =back
+
+=item add_tests( @tests );
+
+The add_tests() method allows you push an additional list of tests on to the stack before validation. Each element must be an XML::Schematron::Test object or a hash reference. See above for the list of key/value pairs expected if hashrefs are used.
 
 =item verify('my_xml_file.xml' or $some_xml_string)
 
@@ -221,7 +182,7 @@ Kip Hampton, khampton@totalcinema.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it  
+Copyright (c) 2000-2010 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it  
 under the same terms as Perl itself.
 
 =head1 SEE ALSO

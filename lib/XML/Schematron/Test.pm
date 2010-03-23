@@ -3,7 +3,7 @@ use Moose;
 
 has [qw|expression context message test_type|] => (
     traits    => ['String'],
-    is          => 'ro',
+    is          => 'rw',
     isa         => 'Str',
     required    => 1, 
 );

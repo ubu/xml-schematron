@@ -13,7 +13,7 @@
 
 #     BUILD_REQUIRES => {  }
 #     NAME => q[XML::Schematron]
-#     PREREQ_PM => { XML::SAX=>q[0], XML::LibXSLT=>q[0], XML::LibXML=>q[0] }
+#     PREREQ_PM => { XML::SAX=>q[0], XML::LibXSLT=>q[0], MooseX::Types::Path::Class=>q[0], XML::Filter::BufferText=>q[0], XML::LibXML=>q[0], MooseX::NonMoose=>q[0], Moose=>q[0] }
 #     VERSION_FROM => q[lib/XML/Schematron.pm]
 
 # --- MakeMaker post_initialize section:
@@ -53,11 +53,11 @@ DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
 NAME = XML::Schematron
 NAME_SYM = XML_Schematron
-VERSION = 1.02
+VERSION = 1.03
 VERSION_MACRO = VERSION
-VERSION_SYM = 1_02
+VERSION_SYM = 1_03
 DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
-XS_VERSION = 1.02
+XS_VERSION = 1.03
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
 INST_ARCHLIB = blib/arch
@@ -183,6 +183,7 @@ PERL_ARCHIVE_AFTER =
 
 TO_INST_PM = lib/XML/Schematron.pm \
 	lib/XML/Schematron/LibXSLT.pm \
+	lib/XML/Schematron/Schema.pm \
 	lib/XML/Schematron/SchemaReader.pm \
 	lib/XML/Schematron/Test.pm \
 	lib/XML/Schematron/XPath.pm \
@@ -194,6 +195,8 @@ PM_TO_BLIB = lib/XML/Schematron/XPath.pm \
 	blib/lib/XML/Schematron/Test.pm \
 	lib/XML/Schematron/SchemaReader.pm \
 	blib/lib/XML/Schematron/SchemaReader.pm \
+	lib/XML/Schematron/Schema.pm \
+	blib/lib/XML/Schematron/Schema.pm \
 	lib/XML/Schematron.pm \
 	blib/lib/XML/Schematron.pm \
 	lib/XML/Schematron/XSLTProcessor.pm \
@@ -268,7 +271,7 @@ RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
 DISTNAME = XML-Schematron
-DISTVNAME = XML-Schematron-1.02
+DISTVNAME = XML-Schematron-1.03
 
 
 # --- MakeMaker macro section:
@@ -493,7 +496,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) Generating META.yml
 	$(NOECHO) $(ECHO) '--- #YAML:1.0' > META_new.yml
 	$(NOECHO) $(ECHO) 'name:               XML-Schematron' >> META_new.yml
-	$(NOECHO) $(ECHO) 'version:            1.02' >> META_new.yml
+	$(NOECHO) $(ECHO) 'version:            1.03' >> META_new.yml
 	$(NOECHO) $(ECHO) 'abstract:           ~' >> META_new.yml
 	$(NOECHO) $(ECHO) 'author:  []' >> META_new.yml
 	$(NOECHO) $(ECHO) 'license:            unknown' >> META_new.yml
@@ -503,9 +506,13 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) 'build_requires:' >> META_new.yml
 	$(NOECHO) $(ECHO) '    ExtUtils::MakeMaker:  0' >> META_new.yml
 	$(NOECHO) $(ECHO) 'requires:' >> META_new.yml
-	$(NOECHO) $(ECHO) '    XML::LibXML:   0' >> META_new.yml
-	$(NOECHO) $(ECHO) '    XML::LibXSLT:  0' >> META_new.yml
-	$(NOECHO) $(ECHO) '    XML::SAX:      0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    Moose:                0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    MooseX::NonMoose:     0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    MooseX::Types::Path::Class:  0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    XML::Filter::BufferText:  0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    XML::LibXML:          0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    XML::LibXSLT:         0' >> META_new.yml
+	$(NOECHO) $(ECHO) '    XML::SAX:             0' >> META_new.yml
 	$(NOECHO) $(ECHO) 'no_index:' >> META_new.yml
 	$(NOECHO) $(ECHO) '    directory:' >> META_new.yml
 	$(NOECHO) $(ECHO) '        - t' >> META_new.yml
@@ -804,10 +811,14 @@ testdb_static :: testdb_dynamic
 # --- MakeMaker ppd section:
 # Creates a PPD (Perl Package Description) for a binary distribution.
 ppd :
-	$(NOECHO) $(ECHO) '<SOFTPKG NAME="$(DISTNAME)" VERSION="1.02">' > $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '<SOFTPKG NAME="$(DISTNAME)" VERSION="1.03">' > $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <ABSTRACT></ABSTRACT>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <AUTHOR></AUTHOR>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Moose::" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="MooseX::NonMoose" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="MooseX::Types::Path::Class" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="XML::Filter::BufferText" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="XML::LibXML" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="XML::LibXSLT" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="XML::SAX" />' >> $(DISTNAME).ppd
@@ -824,6 +835,7 @@ pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	  lib/XML/Schematron/XPath.pm blib/lib/XML/Schematron/XPath.pm \
 	  lib/XML/Schematron/Test.pm blib/lib/XML/Schematron/Test.pm \
 	  lib/XML/Schematron/SchemaReader.pm blib/lib/XML/Schematron/SchemaReader.pm \
+	  lib/XML/Schematron/Schema.pm blib/lib/XML/Schematron/Schema.pm \
 	  lib/XML/Schematron.pm blib/lib/XML/Schematron.pm \
 	  lib/XML/Schematron/XSLTProcessor.pm blib/lib/XML/Schematron/XSLTProcessor.pm \
 	  lib/XML/Schematron/LibXSLT.pm blib/lib/XML/Schematron/LibXSLT.pm 

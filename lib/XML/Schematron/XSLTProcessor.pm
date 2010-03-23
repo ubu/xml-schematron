@@ -1,7 +1,6 @@
 package XML::Schematron::XSLTProcessor;
 use Moose::Role;
-
-requires qw( tests );
+with 'XML::Schematron::Schema';
 
 has template_buffer => (
     traits    => ['String'],
@@ -14,6 +13,7 @@ has template_buffer => (
     },
 
 );
+
 sub tests_to_xsl {
     my $self = shift;
     my $mode = 'M0';

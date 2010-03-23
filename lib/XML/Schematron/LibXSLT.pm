@@ -23,7 +23,7 @@ sub verify {
     my $self = shift;    
     my $xml = shift;
 
-    $self->parse_schema;
+    $self->parse_schema if $self->has_schema;
 
     my $template = $self->dump_xsl;
     my $xml_doc;
@@ -50,44 +50,8 @@ sub verify {
 }
 
 with 'XML::Schematron::XSLTProcessor';
+
 1;
-
-=cut
-sub verify {
-    my $self = shift;    
-    my $xml = shift;
-    my ($data, $do_array);
-    $do_array++ if wantarray;
-
-    $self->build_tests if $self->{schema};
-
-    my $template = $self->tests_to_xsl;
-    #print "$template\n";
-
-    my $parser = XML::LibXML->new();
-    my $xslt = XML::LibXSLT->new();
-
-    my $xml_doc;
-
-    if ( $xml =~ /^\s*<\?\s*(xml|XML)\b/ ) {
-        $xml_doc = $parser->parse_string($xml);
-    }
-    else {
-        $xml_doc = $parser->parse_file($xml);
-    }
-
-    my $style_doc = $parser->parse_string($template);
-    my $stylesheet = $xslt->parse_stylesheet($style_doc);
-    my $result = $stylesheet->transform($xml_doc);
-    my $ret_string = $stylesheet->output_string($result);
-
-    if ($do_array) {
-        my @ret_array = split "\n", $ret_string;
-        return @ret_array;
-    }
-
-    return $ret_string;
-}
 
 1;
 __END__
@@ -100,8 +64,8 @@ XML::Schematron::LibXSLT - Perl extension for validating XML with XPath/XSLT exp
 =head1 SYNOPSIS
 
 
-  use XML::Schematron::LibXSLT;
-  my $pseudotron = XML::Schematron::LibXSLT->new(schema => 'my_schema.xml');
+  use XML::Schematron;
+  my $pseudotron = XML::Schematron->>new_with_traits( traits => ['LibXSLT'], schema => 'my_schema.xml');
   my $messages = $pseudotron->verify('my_doc.xml');
 
   if ($messages) {
@@ -127,7 +91,7 @@ XML::Schematron::LibXSLT serves as a simple validator for XML based on Rick JELL
 schema defines a set of rules in the XPath language that are used to examine the contents of an XML document tree.
 
 A simplified example: 
-
+ <?xml version="1.0" ?>
  <schema>
   <pattern>
    <rule context="page">
@@ -142,12 +106,6 @@ Note that an 'assert' rule will return if the result of the test expression is I
 only if the test expression evalutes to true.
 
 =head1 METHODS
-
-=over 4
-
-=item new()
-  
-The 'new' constructor accepts the following "named" arguments:
 
 =over 4
 
@@ -169,34 +127,25 @@ reference to a list of lists where the format of the sub-lists must conform to t
 When called with a single scalar as its argument, this method sets/updates the schema file to be used for generatng
 tests. Otherwise, it simply returns the name of the schema file (if any).
 
-=item tests()
-
-When called with a reference to a list of lists as its argument (see the format in the description of the 'tests' argument to 
-the new() method for details), this method sets the current test stack. Otherwise, it returns an arrayref to the current test 
-stack (if any).
-
-=item add_test(%args);
-
-The add_test() method allows you push additional tests on to the stack before validation using the typical "hash of named
-parameters" style.
+The add_test() method allows you push additional a additional test on to the stack before validation. This method's argument must be an XML::Schematron::Test object or a hash reference with the following structure:
 
 Arguments for this method:
 
 =over 4
 
-=item * expr (required)
+=item * expression (required)
 
 The XPath expression to evaluate.
-                 
+
 =item * context (required)
 
 An element name or XPath location to use as the context of the test expression.
 
-=item * type (required)
+=item * test_type (required)
 
-The B<type> argument must be set to either 'assert' or 'report'. Assert tests will return the associated message only if the
-the corresponding test expression is B<not> true, while 'report' tests will return only if their associated test expression
-B<are> true.
+The B<test_type> argument must be set to either 'assert' or 'report'. Assert tests will return the associated message
+only if the the corresponding test expression is B<not> true, while 'report' tests will return only if their associated test
+expression B<are> true.  
 
 =item * message (required)
 
@@ -204,18 +153,25 @@ The text message to display when the test condition is met.
 
 =item * pattern (optional)
 
-Optional descriptive text for the returned message that allows a logical grouping of tests.
+Optional descriptive text for the returned message that allows a logical grouping of tests.  
+
 
 Example:
 
-      
-  $obj->add_test(expr => 'count(@*) > 0',
-                 context => '/pattern',
+
+  $obj->add_test({expr => 'count(@*) > 0',
+                 context => '/pattern',       
                  message => 'Pattern should have at least one attribute',
                  type => 'assert',
-                 pattern => 'Basic tests');
+                 pattern => 'Basic tests'});
 
 Note that add_test() pushes a new test on to the existing test list, while tests() redefines the entire list.
+
+=back
+
+=item add_tests( @tests );
+
+The add_tests() method allows you push an additional list of tests on to the stack before validation. Each element must be an XML::Schematron::Test object or a hash reference. See above for the list of key/value pairs expected if hashrefs are used.
 
 =back
 
@@ -234,13 +190,10 @@ The dump_xsl method will return the internal XSLT script created from your schem
 
 =head1 CONFORMANCE
 
-Internally, XML::Schematron::LibXSLT uses the Gnome Project's XSLT proccessor via XML::LibXSLT and, while this proccessor is
-not 100% compliant with the XSLT spec at the time of this writing, it is the best XSLT libraray available to the Perl World at
-the moment. It is therefore possible that you might use a completely valid XSLT expression within one of your schema's tests 
-that will cause this module to die unexpectedly. 
+Internally, XML::Schematron::LibXSLT uses the Gnome Project's XSLT proccessor via XML::LibXSLT, the best XSLT libraray available to the Perl World at
+the moment.
 
-For those platforms on which libxslt is not available, please see the documentation for XML::Scmeatron::Sablotron and
-XML::Schematron::XPath (also in this distribution) for alternatives. 
+For those platforms on which libxslt is not available, please see the documentation for L<XML::Schematron::XPath> (also in this distribution) for alternatives. 
 
 =head1 AUTHOR
 
@@ -248,7 +201,7 @@ Kip Hampton, khampton@totalcinema.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it  
+Copyright (c) 2000-2010 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it  
 under the same terms as Perl itself.
 
 =head1 SEE ALSO
