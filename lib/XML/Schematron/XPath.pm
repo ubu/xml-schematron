@@ -1,5 +1,6 @@
 package XML::Schematron::XPath;
 use Moose::Role;
+use namespace::autoclean;
 with 'XML::Schematron::Schema';
 
 use XML::XPath;
@@ -60,7 +61,6 @@ sub verify {
 
     return wantarray ? @messages : join "\n", @messages;  
 }
-
 
 1;
 __END__

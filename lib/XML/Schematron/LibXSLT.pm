@@ -1,5 +1,6 @@
 package XML::Schematron::LibXSLT;
 use Moose::Role;
+use namespace::autoclean;
 
 use XML::LibXSLT;
 use XML::LibXML;

@@ -1,5 +1,6 @@
 package XML::Schematron::SchemaReader;
 use Moose;
+use namespace::autoclean;
 use MooseX::NonMoose;
 extends 'XML::SAX::Base';
 
@@ -19,14 +20,14 @@ has test_stack => (
 has [qw|context test_type expression|] => (
     traits    => ['String'],
     is          => 'rw',
-    isa         => 'Str', 
-    required    => 1,
+    isa         => 'Str',
+    default     => sub { return ''; }
 );
 
 has pattern => (
     traits    => ['String'],
     is          => 'rw',
-    isa         => 'Str', 
+    isa         => 'Str',
     required    => 1,
     default     => sub { '[none]' },
 );
@@ -34,8 +35,8 @@ has pattern => (
 has message => (
     traits    => ['String'],
     is          => 'rw',
-    isa         => 'Str', 
-    required    => 1,
+    isa         => 'Str',
+    default     => sub { return '' },
     handles     => {
           add_to_message     => 'append',
           reset_message     => 'clear',
@@ -52,7 +53,7 @@ sub start_element {
     foreach my $attr ( keys ( %{$el->{Attributes}} ) ) {
         $attrs->{$el->{Attributes}->{$attr}->{LocalName}} = $el->{Attributes}->{$attr}->{Value};
     }
-    
+
     #warn "EL " . Dumper( $el );
 
     if ( defined( $attrs->{context} )) {
@@ -76,7 +77,7 @@ sub start_element {
 
 sub end_element {
     my ($self, $el) = @_;
-    
+
     if (( $el->{LocalName} =~ /(assert|report)$/)) {
         $self->test_type( $el->{LocalName} );
 
@@ -87,7 +88,7 @@ sub end_element {
                         message     => $self->message,
                         pattern     => $self->pattern,
                     );
-                    
+
         $self->add_test( $test );
         $self->reset_message;
     }
@@ -97,10 +98,6 @@ sub characters {
     my ($self, $characters) = @_;
     $self->add_to_message( $characters->{Data} );
 }
-
-# after 'end_document' => sub {
-#     return [qw|foo bar bax quuuux|];
-# };
 
 no Moose;
 __PACKAGE__->meta->make_immutable;

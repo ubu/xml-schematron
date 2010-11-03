@@ -1,6 +1,7 @@
 package XML::Schematron::Schema;
 
 use Moose::Role;
+use namespace::autoclean;
 
 use MooseX::Types::Path::Class;
 use XML::SAX::ParserFactory;
@@ -54,5 +55,6 @@ has schema => (
     coerce      => 1,
     predicate   => 'has_schema',
 );
+
 
 1;

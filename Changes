@@ -1,4 +1,10 @@
 Revision history for Perl extension XML::Schematron.
+1.09  We Nov 3 2010
+    - Bugfix for modern Moose/Perl combos and native trait values. Thanks to Denise Mauldin for the catch.
+
+1.03  Tue Mar 19 2010
+    - Migrated to Moose
+
 0.97  Mon Jan 21 2002
 	- bugfix for verify() in XPath.pm. Thanks to Michael Roberts <mroberts@cq.com>.
 
@@ -24,14 +30,14 @@ Revision history for Perl extension XML::Schematron.
 
 0.52  Tue Dec 05 2000
 	- added add_test() method.
-	- added schema() method to the base package, dropped requirement of 
+	- added schema() method to the base package, dropped requirement of
 	  'schema' arg to the new() constructor.
 	- added the tests() method to the base package.
  	- updated docs.
 
 0.51  Tue Oct 31 2000
 	- added array vs. string context for returning messages.
-        - removed dependency on Sablotron in base package 
+        - removed dependency on Sablotron in base package
           (Thanks to Matt Sergeant for the catch in both cases)
         - Added Copyright notice
 

@@ -1,30 +1,24 @@
 package XML::Schematron;
-
-use vars qw/$VERSION/;
-$VERSION = '1.03';
-
 use Moose;
+use namespace::autoclean;
 with 'MooseX::Traits';
 
 use Moose::Util::TypeConstraints;
 use XML::Schematron::Test;
 use Check::ISA;
 
+use vars qw/$VERSION/;
+$VERSION = '1.09';
+
 
 has '+_trait_namespace' => ( default => 'XML::Schematron' );
-
-#subtype 'My::XML::Schematron::Test' => as class_type('XML::Schematron::Test');
-
-#coerce 'My::XML::Schematron::Test'
-#    => from 'HashRef'
-#        => via { warn "WWWTTTFFF"; XML::Schematron::Test->new( %{$_} ) };
 
 
 has tests => (
     traits      => ['Array'],
     is          =>  'rw',
     isa         =>  'ArrayRef[XML::Schematron::Test]',
-    default     =>  sub { [] },    
+    default     =>  sub { [] },
     handles     => {
         _add_test    => 'push',
         all_tests   => 'elements',
@@ -52,6 +46,8 @@ sub add_tests {
     }
 }
 
+__PACKAGE__->meta->make_immutable;
+
 1;
 
 __END__
@@ -78,7 +74,7 @@ Kip Hampton, khampton@totalcinema.com
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2010 Kip Hampton. All rights reserved. This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself. 
+under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
